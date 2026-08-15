@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-07-08T16:30:50.848311",
+  "face_metrics": {
+    "blink_rate": 0.0,
+    "pupil_dilation": 0.0,
+    "mouth_activity": 0.26573356697849443,
+    "head_movement": 0.008360473657546013,
+    "gaze_shift": 0.00433889935929812,
+    "face_present": true,
+    "landmarks": 
