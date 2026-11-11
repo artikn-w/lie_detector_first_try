@@ -11,7 +11,6 @@ import mediapipe as mp
 import numpy as np
 
 
-WINDOW = "Face Motion Lab"
 FEATURES = ("blinks_per_minute", "head_speed_deg_per_sec", "mouth_opening", "brow_height")
 FIELDS = ("participant", "trial", "label", "seconds", *FEATURES)
 POSE_POINTS = [1, 152, 33, 263, 61, 291]
@@ -121,68 +120,24 @@ class Tracker:
         return status, None, None
 
 
-def draw(frame, status, values, bbox, trial, history, recording):
-    if bbox:
-        cv2.rectangle(frame, *bbox, (170, 220, 90), 2)
-    cv2.rectangle(frame, (8, 8), (440, 265), (30, 26, 23), -1)
-    lines = [WINDOW, status, "Q quit | R recalibrate"]
-    if trial:
-        lines += [f"Trial {trial} | " + ("Recording" if recording else "Space to start trial")]
-    if values is not None:
-        for name, value in zip(FEATURES, values):
-            reading = "--" if value is None else f"{value:.3f}"
-            lines.append(f"{name.replace('_', ' ')}  {reading}")
-    for index, line in enumerate(lines):
-        cv2.putText(frame, line, (20, 32 + 22 * index),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, (245, 245, 245), 1, cv2.LINE_AA)
-    for previous, current in zip(history, list(history)[1:]):
-        if previous[1] is None or current[1] is None:
-            continue
-        origin = history[-1][0] - 10
-        start, end = [(20 + int((t - origin) * 38),
-                       255 - int(min(rate, 90) / 90 * 45)) for t, rate in (previous, current)]
-        cv2.line(frame, start, end, (170, 220, 90), 1)
-
-
 def run(args, writer=None):
+    import tkinter as tk
+
+    from dashboard import Dashboard
+
     cap = cv2.VideoCapture(args.camera)
     tracker = None
     try:
         if not cap.isOpened():
             raise SystemExit("Cannot open camera. Check permissions or use --camera INDEX.")
         tracker = Tracker()
-        cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
-        history = deque()
-        last_sample = 0
-        started = None
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                raise SystemExit("Camera stopped delivering frames.")
-            now = time.monotonic()
-            status, values, bbox = tracker.measure(frame, now)
-            if now - last_sample >= 0.1:
-                history.append((now, values[0] if values else None))
-                while history and now - history[0][0] > 10:
-                    history.popleft()
-                if writer and started is not None and values is not None and all(value is not None for value in values):
-                    writer.writerow((args.participant, args.trial, args.label, now - started, *values))
-                last_sample = now
-            draw(frame, status, values, bbox, args.trial, history, started is not None)
-            cv2.imshow(WINDOW, frame)
-            key = cv2.waitKey(1) & 0xFF
-            if key in (ord("q"), 27) or cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
-                break
-            if key == ord(" ") and writer and started is None and values and values[0] is not None:
-                started = now
-            if key == ord("r") and not writer:
-                tracker.reset()
-                history.clear()
+        root = tk.Tk()
+        Dashboard(root, cap, tracker, args, writer)
+        root.mainloop()
     finally:
         cap.release()
         if tracker is not None:
             tracker.mesh.close()
-        cv2.destroyAllWindows()
 
 
 def main():
